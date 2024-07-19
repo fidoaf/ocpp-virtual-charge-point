@@ -38,6 +38,24 @@ export class TransactionManager {
           ],
         })
       );
+      vcp.send(
+        call("MeterValues", {
+          connectorId: connectorId,
+          transactionId: transactionId,
+          meterValue: [
+            {
+              timestamp: new Date(),
+              sampledValue: [
+                {
+                  value: "50",
+                  measurand: "SoC",
+                  unit: "Percent",
+                },
+              ],
+            },
+          ],
+        })
+      );
     }, METER_VALUES_INTERVAL_SEC * 1000);
     this.transactions.set(transactionId.toString(), {
       transactionId: transactionId,

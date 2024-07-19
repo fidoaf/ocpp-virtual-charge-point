@@ -1,0 +1,1 @@
+https://github.com/mobilityhouse/ocpp/tree/master/ocpp/v16/schemas
