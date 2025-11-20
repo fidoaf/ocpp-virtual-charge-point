@@ -1,274 +1,185 @@
-import * as uuid from "uuid";
-import { call as callFactory, callResult } from "../messageFactory";
-import { OcppCall, OcppCallError, OcppCallResult } from "../ocppMessage";
+import type { z } from "zod";
+import type {
+  OcppCall,
+  OcppCallError,
+  OcppCallResult,
+  OcppIncoming,
+  OcppOutgoing,
+} from "../ocppMessage";
+import type { OcppMessageHandler } from "../ocppMessageHandler";
+import type { VCP } from "../vcp";
+import { authorizeOcppOutgoing } from "./messages/authorize";
+import { bootNotificationOcppOutgoing } from "./messages/bootNotification";
+import { cancelReservationOcppOutgoing } from "./messages/cancelReservation";
+import { certificateSignedOcppOutgoing } from "./messages/certificateSigned";
+import { changeAvailabilityOcppIncoming } from "./messages/changeAvailability";
+import { clearCacheOcppIncoming } from "./messages/clearCache";
+import { clearChargingProfileOcppIncoming } from "./messages/clearChargingProfile";
+import { clearDisplayMessageOcppIncoming } from "./messages/clearDisplayMessage";
+import { clearVariableMonitoringOcppIncoming } from "./messages/clearVariableMonitoring";
+import { clearedChargingLimitOcppOutgoing } from "./messages/clearedChargingLimit";
+import { costUpdatedOcppIncoming } from "./messages/costUpdated";
+import { customerInformationOcppIncoming } from "./messages/customerInformation";
 import {
-  CallHandler,
-  CallResultHandler,
-  OcppMessageHandler,
-} from "../ocppMessageHandler";
-import { delay } from "../utils";
-import { VCP } from "../vcp";
-import { transactionManager } from "./transactionManager";
-import { RequestStartTransactionReq, TransactionEventReq } from "./types";
+  dataTransferIncomingOcppMessage,
+  dataTransferOutgoingOcppMessage,
+} from "./messages/dataTransfer";
+import { deleteCertificateOcppIncoming } from "./messages/deleteCertificate";
+import { firmwareStatusNotificationOcppOutgoing } from "./messages/firmwareStatusNotification";
+import { get15118EVCertificateOcppIncoming } from "./messages/get15118EVCertificate";
+import { getBaseReportOcppIncoming } from "./messages/getBaseReport";
+import { getCertificateStatusOcppOutgoing } from "./messages/getCertificateStatus";
+import { getChargingProfilesOcppIncoming } from "./messages/getChargingProfiles";
+import { getCompositeScheduleOcppIncoming } from "./messages/getCompositeSchedule";
+import { getDisplayMessagesOcppIncoming } from "./messages/getDisplayMessages";
+import { getInstalledCertificateIdsOcppIncoming } from "./messages/getInstalledCertificateIds";
+import { getLocalListVersionOcppIncoming } from "./messages/getLocalListVersion";
+import { getLogOcppIncoming } from "./messages/getLog";
+import { getMonitoringReportOcppIncoming } from "./messages/getMonitoringReport";
+import { getReportOcppIncoming } from "./messages/getReport";
+import { getTransactionStatusOcppIncoming } from "./messages/getTransactionStatus";
+import { getVariablesOcppIncoming } from "./messages/getVariables";
+import { heartbeatOcppOutgoing } from "./messages/heartbeat";
+import { installCertificateOcppIncoming } from "./messages/installCertificate";
+import { logStatusNotificationOcppOutgoing } from "./messages/logStatusNotification";
+import { meterValuesOcppOutgoing } from "./messages/meterValues";
+import { notifyChargingLimitOcppOutgoing } from "./messages/notifyChargingLimit";
+import { notifyCustomerInformationOcppOutgoing } from "./messages/notifyCustomerInformation";
+import { notifyDisplayMessagesOcppOutgoing } from "./messages/notifyDisplayMessages";
+import { notifyEVChargingNeedsOcppOutgoing } from "./messages/notifyEVChargingNeeds";
+import { notifyEVChargingScheduleOcppOutgoing } from "./messages/notifyEVChargingSchedule";
+import { notifyEventOcppOutgoing } from "./messages/notifyEvent";
+import { notifyMonitoringReportOcppOutgoing } from "./messages/notifyMonitoringReport";
+import { notifyReportOcppOutgoing } from "./messages/notifyReport";
+import { publishFirmwareOcppIncoming } from "./messages/publishFirmware";
+import { publishFirmwareStatusNotificationOcppOutgoing } from "./messages/publishFirmwareStatusNotification";
+import { reportChargingProfilesOcppOutgoing } from "./messages/reportChargingProfiles";
+import { requestStartTransactionOcppIncoming } from "./messages/requestStartTransaction";
+import { requestStopTransactionOcppIncoming } from "./messages/requestStopTransaction";
+import { reservationStatusUpdateOcppOutgoing } from "./messages/reservationStatusUpdate";
+import { reserveNowOcppIncoming } from "./messages/reserveNow";
+import { resetOcppIncoming } from "./messages/reset";
+import { securityEventNotificationOcppOutgoing } from "./messages/securityEventNotification";
+import { sendLocalListOcppIncoming } from "./messages/sendLocalList";
+import { setChargingProfileOcppIncoming } from "./messages/setChargingProfile";
+import { setDisplayMessageOcppIncoming } from "./messages/setDisplayMessage";
+import { setMonitoringBaseOcppIncoming } from "./messages/setMonitoringBase";
+import { setMonitoringLevelOcppIncoming } from "./messages/setMonitoringLevel";
+import { setNetworkProfileOcppIncoming } from "./messages/setNetworkProfile";
+import { setVariableMonitoringOcppIncoming } from "./messages/setVariableMonitoring";
+import { setVariablesOcppIncoming } from "./messages/setVariables";
+import { signCertificateOcppOutgoing } from "./messages/signCertificate";
+import { statusNotificationOcppOutgoing } from "./messages/statusNotification";
+import { transactionEventOcppOutgoing } from "./messages/transactionEvent";
+import { triggerMessageOcppIncoming } from "./messages/triggerMessage";
+import { unlockConnectorOcppIncoming } from "./messages/unlockConnector";
+import { unpublishFirmwareOcppIncoming } from "./messages/unpublishFirmware";
+import { updateFirmwareOcppIncoming } from "./messages/updateFirmware";
 
-const callHandlers: { [key: string]: CallHandler } = {
-  ChangeConfiguration: (vcp: VCP, call: OcppCall<any>) => {
-    vcp.respond(callResult(call, { status: "Accepted" }));
-  },
-  GetConfiguration: (vcp: VCP, call: OcppCall<any>) => {
-    vcp.respond(callResult(call, { configurationKey: [] }));
-  },
-  GetBaseReport: (vcp: VCP, call: OcppCall<any>) => {
-    vcp.respond(callResult(call, { status: "Accepted" }));
-    vcp.send(
-      callFactory("NotifyReport", {
-        requestId: call.payload.requestId,
-        generatedAt: new Date(),
-        seqNo: 0,
-        tbc: false,
-        reportData: [
-          {
-            component: {
-              name: "OCPPCommCtrlr",
-            },
-            variable: {
-              name: "HeartbeatInterval",
-            },
-            variableAttribute: [
-              {
-                type: "Actual",
-                value: "60",
-                mutability: "ReadWrite",
-                persistent: true,
-                constant: false,
-              },
-            ],
-            variableCharacteristics: {
-              unit: "s",
-              dataType: "integer",
-              supportsMonitoring: false,
-            },
-          },
-          {
-            component: {
-              name: "AuthCtrlr",
-            },
-            variable: {
-              name: "AuthorizeRemoteStart",
-            },
-            variableAttribute: [
-              {
-                type: "Actual",
-                value: "false",
-                mutability: "ReadWrite",
-                persistent: true,
-                constant: true,
-              },
-            ],
-            variableCharacteristics: {
-              dataType: "boolean",
-              supportsMonitoring: false,
-            },
-          },
-          {
-            component: {
-              name: "AuthCtrlr",
-            },
-            variable: {
-              name: "LocalPreAuthorize",
-            },
-            variableAttribute: [
-              {
-                type: "Actual",
-                value: "false",
-                mutability: "ReadWrite",
-                persistent: true,
-                constant: true,
-              },
-            ],
-            variableCharacteristics: {
-              dataType: "boolean",
-              supportsMonitoring: false,
-            },
-          },
-          {
-            component: {
-              name: "TxCtrlr",
-            },
-            variable: {
-              name: "EVConnectionTimeOut",
-            },
-            variableAttribute: [
-              {
-                type: "Actual",
-                value: "10",
-                mutability: "ReadWrite",
-                persistent: true,
-                constant: false,
-              },
-            ],
-            variableCharacteristics: {
-              dataType: "integer",
-              supportsMonitoring: false,
-            },
-          },
-        ],
-      })
-    );
-  },
-  SetVariables: (vcp: VCP, call: OcppCall<any>) => {
-    vcp.respond(
-      callResult(call, {
-        setVariableResult: [
-          {
-            attributeStatus: "Accepted",
-            component: {
-              name: "SecurityCtrlr",
-            },
-            variable: {
-              name: "BasicAuthPassword",
-            },
-          },
-        ],
-      })
-    );
-  },
-  GetVariables: (vcp: VCP, call: OcppCall<any>) => {
-    vcp.respond(
-      callResult(call, {
-        getVariableResult: [],
-      })
-    );
-  },
-  Reset: async (vcp: VCP, call: OcppCall<any>) => {
-    vcp.respond(callResult(call, { status: "Accepted" }));
-    await delay(3_000);
-    process.exit(1);
-  },
-  UnlockConnector: (vcp: VCP, call: OcppCall<any>) => {
-    vcp.respond(callResult(call, { status: "Unlocked" }));
-  },
-  RequestStartTransaction: (
-    vcp: VCP,
-    call: OcppCall<RequestStartTransactionReq>
-  ) => {
-    const transactionId = uuid.v4();
-    transactionManager.startTransaction(
-      vcp,
-      transactionId,
-      call.payload.evseId ?? 1,
-      call.payload.connectorId ?? 1
-    );
-    vcp.respond(
-      callResult(call, {
-        status: "Accepted",
-      })
-    );
-    vcp.send(
-      callFactory("StatusNotification", {
-        evseId: call.payload.evseId ?? 1,
-        connectorId: call.payload.connectorId ?? 1,
-        connectorStatus: "Occupied",
-        timestamp: new Date(),
-      })
-    );
-    vcp.send(
-      callFactory<TransactionEventReq>("TransactionEvent", {
-        eventType: "Started",
-        timestamp: new Date(),
-        seqNo: 0,
-        triggerReason: "Authorized",
-        transactionInfo: {
-          transactionId: transactionId,
-        },
-        idToken: call.payload.idToken,
-        evse: {
-          id: call.payload.evseId ?? 1,
-          connectorId: call.payload.connectorId ?? 1,
-        },
-        meterValue: [
-          {
-            timestamp: new Date(),
-            sampledValue: [
-              {
-                value: 0,
-                measurand: "Energy.Active.Import.Register",
-                unitOfMeasure: {
-                  unit: "kWh",
-                },
-              },
-            ],
-          },
-        ],
-      })
-    );
-  },
-  RequestStopTransaction: (vcp: VCP, call: OcppCall<any>) => {
-    vcp.respond(
-      callResult(call, {
-        status: "Accepted",
-      })
-    );
-    vcp.send(
-      callFactory<TransactionEventReq>("TransactionEvent", {
-        eventType: "Ended",
-        timestamp: new Date(),
-        seqNo: 0,
-        triggerReason: "RemoteStop",
-        transactionInfo: {
-          transactionId: call.payload.transactionId,
-        },
-        evse: {
-          id: 1,
-          connectorId: 1,
-        },
-      })
-    );
-    vcp.send(
-      callFactory("StatusNotification", {
-        evseId: 1,
-        connectorId: 1,
-        connectorStatus: "Available",
-        timestamp: new Date(),
-      })
-    );
-    transactionManager.stopTransaction(call.payload.transactionId);
-  },
-  DataTransfer: (vcp: VCP, call: OcppCall<any>) => {
-    vcp.respond(callResult(call, { status: "Accepted" }));
-  },
+export const ocppIncomingMessages: {
+  [key: string]: OcppIncoming<z.ZodTypeAny, z.ZodTypeAny>;
+} = {
+  ChangeAvailability: changeAvailabilityOcppIncoming,
+  ClearCache: clearCacheOcppIncoming,
+  ClearChargingProfile: clearChargingProfileOcppIncoming,
+  ClearDisplayMessage: clearDisplayMessageOcppIncoming,
+  ClearVariableMonitoring: clearVariableMonitoringOcppIncoming,
+  CostUpdated: costUpdatedOcppIncoming,
+  CustomerInformation: customerInformationOcppIncoming,
+  DataTransfer: dataTransferIncomingOcppMessage,
+  DeleteCertificate: deleteCertificateOcppIncoming,
+  Get15118EVCertificate: get15118EVCertificateOcppIncoming,
+  GetBaseReport: getBaseReportOcppIncoming,
+  GetChargingProfiles: getChargingProfilesOcppIncoming,
+  GetCompositeSchedule: getCompositeScheduleOcppIncoming,
+  GetDisplayMessages: getDisplayMessagesOcppIncoming,
+  GetInstalledCertificateIds: getInstalledCertificateIdsOcppIncoming,
+  GetLocalListVersion: getLocalListVersionOcppIncoming,
+  GetLog: getLogOcppIncoming,
+  GetMonitoringReport: getMonitoringReportOcppIncoming,
+  GetReport: getReportOcppIncoming,
+  GetTransactionStatus: getTransactionStatusOcppIncoming,
+  GetVariables: getVariablesOcppIncoming,
+  InstallCertificate: installCertificateOcppIncoming,
+  PublishFirmware: publishFirmwareOcppIncoming,
+  RequestStartTransaction: requestStartTransactionOcppIncoming,
+  RequestStopTransaction: requestStopTransactionOcppIncoming,
+  ReserveNow: reserveNowOcppIncoming,
+  Reset: resetOcppIncoming,
+  SendLocalList: sendLocalListOcppIncoming,
+  SetChargingProfile: setChargingProfileOcppIncoming,
+  SetDisplayMessage: setDisplayMessageOcppIncoming,
+  SetMonitoringBase: setMonitoringBaseOcppIncoming,
+  SetMonitoringLevel: setMonitoringLevelOcppIncoming,
+  SetNetworkProfile: setNetworkProfileOcppIncoming,
+  SetVariableMonitoring: setVariableMonitoringOcppIncoming,
+  SetVariables: setVariablesOcppIncoming,
+  TriggerMessage: triggerMessageOcppIncoming,
+  UnlockConnector: unlockConnectorOcppIncoming,
+  UnpublishFirmware: unpublishFirmwareOcppIncoming,
+  UpdateFirmware: updateFirmwareOcppIncoming,
 };
 
-const callResultHandlers: { [key: string]: CallResultHandler } = {
-  BootNotification: (
-    vcp: VCP,
-    call: OcppCall<any>,
-    result: OcppCallResult<any>
-  ) => {
-    vcp.configureHeartbeat(result.payload.interval * 1000);
-  },
+export const ocppOutgoingMessages: {
+  [key: string]: OcppOutgoing<z.ZodTypeAny, z.ZodTypeAny>;
+} = {
+  Authorize: authorizeOcppOutgoing,
+  BootNotification: bootNotificationOcppOutgoing,
+  CancelReservation: cancelReservationOcppOutgoing,
+  CertificateSigned: certificateSignedOcppOutgoing,
+  ClearedChargingLimit: clearedChargingLimitOcppOutgoing,
+  DataTransfer: dataTransferOutgoingOcppMessage,
+  FirmwareStatusNotification: firmwareStatusNotificationOcppOutgoing,
+  GetCertificateStatus: getCertificateStatusOcppOutgoing,
+  Heartbeat: heartbeatOcppOutgoing,
+  LogStatusNotification: logStatusNotificationOcppOutgoing,
+  MeterValues: meterValuesOcppOutgoing,
+  NotifyChargingLimit: notifyChargingLimitOcppOutgoing,
+  NotifyCustomerInformation: notifyCustomerInformationOcppOutgoing,
+  NotifyDisplayMessages: notifyDisplayMessagesOcppOutgoing,
+  NotifyEVChargingNeeds: notifyEVChargingNeedsOcppOutgoing,
+  NotifyEVChargingSchedule: notifyEVChargingScheduleOcppOutgoing,
+  NotifyEvent: notifyEventOcppOutgoing,
+  NotifyMonitoringReport: notifyMonitoringReportOcppOutgoing,
+  NotifyReport: notifyReportOcppOutgoing,
+  PublishFirmwareStatusNotification:
+    publishFirmwareStatusNotificationOcppOutgoing,
+  ReportChargingProfiles: reportChargingProfilesOcppOutgoing,
+  ReservationStatusUpdate: reservationStatusUpdateOcppOutgoing,
+  SecurityEventNotification: securityEventNotificationOcppOutgoing,
+  SignCertificate: signCertificateOcppOutgoing,
+  StatusNotification: statusNotificationOcppOutgoing,
+  TransactionEvent: transactionEventOcppOutgoing,
 };
 
 export const messageHandlerV201: OcppMessageHandler = {
-  handleCall: function (vcp: VCP, call: OcppCall<any>): void {
-    const handler = callHandlers[call.action];
-    if (!handler) {
-      throw new Error("Function not implemented.");
+  // biome-ignore lint/suspicious/noExplicitAny: ocpp types
+  handleCall: (vcp: VCP, call: OcppCall<any>): void => {
+    const ocppMessage = ocppIncomingMessages[call.action];
+    if (!ocppMessage) {
+      throw new Error(
+        `OCPP Incoming Message not implemented for ${call.action}`,
+      );
     }
-    handler(vcp, call);
+    ocppMessage.reqHandler(vcp, call);
   },
-  handleCallResult: function (
+  handleCallResult: (
     vcp: VCP,
+    // biome-ignore lint/suspicious/noExplicitAny: ocpp types
     call: OcppCall<any>,
-    result: OcppCallResult<any>
-  ): void {
-    const handler = callResultHandlers[result.action];
-    if (!handler) {
-      return;
+    // biome-ignore lint/suspicious/noExplicitAny: ocpp types
+    result: OcppCallResult<any>,
+  ): void => {
+    const ocppMessage = ocppOutgoingMessages[result.action];
+    if (!ocppMessage) {
+      throw new Error(
+        `OCPP Outgoing Message not implemented for ${result.action}`,
+      );
     }
-    handler(vcp, call, result);
+    ocppMessage.resHandler(vcp, call, result);
   },
-  handleCallError: function (vcp: VCP, error: OcppCallError<any>): void {
-    // throw new Error("Function not implemented.");
+  // biome-ignore lint/suspicious/noExplicitAny: ocpp types
+  handleCallError: (vcp: VCP, error: OcppCallError<any>): void => {
+    // NOOP
   },
 };

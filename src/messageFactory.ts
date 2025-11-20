@@ -1,10 +1,8 @@
 import * as uuid from "uuid";
-import { OcppCall, OcppCallError, OcppCallResult } from "./ocppMessage";
+import type { OcppCall, OcppCallError, OcppCallResult } from "./ocppMessage";
 
-export const call = <T>(
-  action: string,
-  payload: T | {} = {},
-): OcppCall<T | {}> => {
+// biome-ignore lint/complexity/noBannedTypes: ocpp types
+export const call = <T = {}>(action: string, payload: T): OcppCall<T> => {
   return {
     messageId: uuid.v4(),
     action: action,
@@ -12,9 +10,12 @@ export const call = <T>(
   };
 };
 
-export const callResult = (
+export const callResult = <T>(
+  // biome-ignore lint/suspicious/noExplicitAny: ocpp types
   call: OcppCall<any>,
-  payload: any = {},
+  // biome-ignore lint/complexity/noBannedTypes: ocpp types
+  payload: T | {} = {},
+  // biome-ignore lint/suspicious/noExplicitAny: ocpp types
 ): OcppCallResult<any> => {
   return {
     messageId: call.messageId,
@@ -24,8 +25,11 @@ export const callResult = (
 };
 
 export const callError = (
+  // biome-ignore lint/suspicious/noExplicitAny: ocpp types
   call: OcppCall<any>,
+  // biome-ignore lint/suspicious/noExplicitAny: ocpp types
   payload: any = {},
+  // biome-ignore lint/suspicious/noExplicitAny: ocpp types
 ): OcppCallError<any> => {
   return {
     messageId: call.messageId,

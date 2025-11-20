@@ -1,6 +1,10 @@
 # OCPP Virtual Charge Point
 
-Simple, configurable, terminal-based OCPP Charging Station simulator written in Node.js with JSON Schema validation.
+Simple, configurable, terminal-based OCPP Charging Station simulator written in Node.js with Schema validation.
+
+## Watch our video introduction
+
+[![VCP Video](https://img.youtube.com/vi/YsXjnk0mhfA/0.jpg)](https://www.youtube.com/watch?v=YsXjnk0mhfA)
 
 ## Prerequisites
 
@@ -26,19 +30,25 @@ PASSWORD - if used for OCPP Authentication, otherwise can be left blank
 Run OCPP 1.6:
 
 ```bash
-npx ts-node index_16.ts
+npx tsx index_16.ts
 ```
 
 Run OCPP 2.0.1:
 
 ```bash
-npx ts-node index_201.ts
+npx tsx index_201.ts
+```
+
+When testing different configurations, you can create multiple `.env` files and pass the env file as an argument, for example:
+
+```bash
+npm start -- --env-file=.env index_16.ts
 ```
 
 ## Example
 
 ```bash
-> WS_URL=ws://localhost:3000 CP_ID=vcp_16_test npx ts-node index_16.ts
+> WS_URL=ws://localhost:3000 CP_ID=vcp_16_test npx tsx index_16.ts
 
 2023-03-27 13:09:17 info: Connecting... | {
   endpoint: 'ws://localhost:3000',
@@ -78,7 +88,7 @@ VCP exposes a separate Websocket endpoint that will "proxy" all messages to Cent
 For example usage, see `admin/` folder.
 
 ```bash
-npx ts-node admin/v16/Authorize/authorize.ts
+npx tsx admin/v16/Authorize/authorize.ts
 ```
 
 ---
