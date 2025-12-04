@@ -14,9 +14,11 @@ sendAdminCommand({
         timestamp: new Date(),
         sampledValue: [
           {
-            value: "50",
+            value: "51.0",
+            context: "Sample.Periodic",
+            format: "Raw",
             measurand: "SoC",
-            unit: "Percent",
+            unit: "Percent"
           },
         ],
       },
